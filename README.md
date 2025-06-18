@@ -21,18 +21,43 @@
 </details>
 
 <details>
-  <summary>Пункт 4. Создадим и загрузим данные в базу.</summary>
+  <summary>Пункт 4. Создадим таблицу и загрузим данные в YDB.</summary>
 
-  Чтобы перенести датафрейм в базу, был написан скрипт `csv_to_yandex_db_sql.py`, который на вход получает любой csv датафрейм и генерирует SQL-скрипт для создания БД и вставки данных.
+1. Создадим таблицу `transactions` со схемой:
 
-  Сам скрипт `csv_to_yandex_db_sql.py` и примеры его работы `output_ddl.sql` и `output_upsert.sql` находятся в папке task1.
+   ```sql
+   CREATE TABLE transactions (
+     Customer_ID        Uint64,
+     Name               Utf8,
+     Surname            Utf8,
+     Gender             Utf8,
+     Birthdate          Utf8,
+     Transaction_Amount Double,
+     Date               Date,
+     Merchant_Name      Utf8,
+     Category           Utf8,
+     PRIMARY KEY (Customer_ID, Date)
+   );
+   ```
 
-  Пример команды для запуска скрипта:
+2. Загрузим данные из `data.csv` в таблицу `transactions`:
 
-  ```bash
-  python csv_to_yandex_db_sql.py data.csv -o output.sql -t transactions_v2
-  ```
+   ```bash
+   ydb --endpoint grpcs://ydb.serverless.yandexcloud.net:2135 \
+       --database /ru-central1/b1gpr9g9kp75o3g7kv72/etn8bdk8duv4jk3vtp4q \
+       --sa-key-file authorized_key.json \
+       import file csv \
+         --path transactions \
+         --columns Customer_ID,Name,Surname,Gender,Birthdate,Transaction_Amount,Date,Merchant_Name,Category \
+         --delimiter "," \
+         --skip-rows 1 \
+         --null-value "" \
+         --verbose \
+         data.csv
+   ```
+
 </details>
+
 
 <details>
   <summary>Пункт 5. Создадим трансфер в Object Storage из YDB с Yandex DataTransfer</summary>
@@ -49,7 +74,6 @@
 
   Данные появились в Object Storage, всё верно:
   ![image](https://github.com/user-attachments/assets/0d694099-5276-4003-bfc7-355a9b8d6c41)
-  ![image](https://github.com/user-attachments/assets/d743e6f2-0328-45e8-88a8-212f16e174f1)
 </details>
 
 **Задание 1 завершено**

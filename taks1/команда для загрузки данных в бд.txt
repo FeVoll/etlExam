@@ -1,0 +1,11 @@
+ydb --endpoint grpcs://ydb.serverless.yandexcloud.net:2135 `
+   --database /ru-central1/b1gpr9g9kp75o3g7kv72/etn8bdk8duv4jk3vtp4q `
+   --sa-key-file authorized_key.json `
+   import file csv `
+     --path transactions `
+     --columns Customer_ID,Name,Surname,Gender,Birthdate,Transaction_Amount,Date,Merchant_Name,Category `
+     --delimiter "," `
+     --skip-rows 1 `
+     --null-value "" `
+     --verbose `
+    data.csv
