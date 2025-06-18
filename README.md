@@ -16,7 +16,13 @@
 
 ## Пункт 4. Создадим и загрузим данные в базу. 
 
-Скрипты ```create_table.yql``` и ```upsert_all_data.yql```
+Чтобы перенести датафрейм в базу, быд написан скрипт ```csv_to_yandex_db_sql.py```  , который на вход получает любой цсв датафрейм и генерирует скл скрипт для создания БД и вставки в нее данных.
+
+Сам скрипт ```csv_to_yandex_db_sql.py```  и пример его работы ```output.sql``` находятся в папке task1 
+
+Пример команды для запуска скрипта:
+
+```python csv_to_yandex_db_sql.py data.csv -o output.sql -t transactions_v2```
 
 ## Пункт 5. Создадим трансфер в Object Storage из YDB с Yandex DataTransfer
 
