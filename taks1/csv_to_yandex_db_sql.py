@@ -1,76 +1,113 @@
 import pandas as pd
 import argparse
 import os
+import re
+from typing import List, Tuple
 
-def infer_sql_type(dtype):
-
-    #Преобразует тип pandas в SQL-тип для Yandex DB.
-
+def infer_sql_type(dtype) -> str:
+    """
+    Преобразует тип pandas в SQL-тип Yandex DB (YDB).
+    """
     if pd.api.types.is_integer_dtype(dtype):
-        return 'BIGINT'
+        return 'Uint64'
     if pd.api.types.is_float_dtype(dtype):
-        return 'DOUBLE PRECISION'
+        return 'Double'
     if pd.api.types.is_bool_dtype(dtype):
-        return 'BOOLEAN'
+        return 'Bool'
     if pd.api.types.is_datetime64_any_dtype(dtype):
-        return 'TIMESTAMP'
-    # По умолчанию — текстовая колонка
-    return 'TEXT'
+        return 'Timestamp'
+    return 'Utf8'
 
 
-def escape_value(val):
+def sanitize_column(col: str) -> str:
+    """
+    Преобразует имя столбца в допустимый идентификатор: заменяет недопустимые символы на подчёркивания.
+    """
+    clean = re.sub(r'[^0-9A-Za-z_]', '_', col)
+    if re.match(r'^[0-9]', clean):
+        clean = '_' + clean
+    return clean
+
+
+def escape_value(val, dtype) -> str:
+    """
+    Экранирует значение для вставки: строки в двойных кавычках, даты — через CAST(... AS Timestamp).
+    """
     if pd.isna(val):
         return 'NULL'
+    if dtype.name.startswith('datetime') or dtype.name.startswith('Timestamp'):
+        ts = val.strftime('%Y-%m-%dT%H:%M:%SZ')
+        return f'CAST("{ts}" AS Timestamp)'
     if isinstance(val, str):
-        # Дублируем одиночные кавычки
-        val = val.replace("'", "''")
-        return f"'{val}'"
-    if isinstance(val, pd.Timestamp):
-        return f"'{val.isoformat()}'"
-    # Числа и булевы значения
+        esc = val.replace('"', '\\"')
+        return f'"{esc}"'
     return str(val)
 
 
+def generate_sql(df: pd.DataFrame, table_name: str) -> Tuple[str,str]:
+    """
+    Возвращает DDL и UPSERT запросы отдельно.
+    """
+    clean_cols = list(df.columns)
+    # DDL
+    col_defs: List[str] = ['id Uint64']
+    for col in clean_cols:
+        col_defs.append(f'{col} {infer_sql_type(df[col].dtype)}')
+    col_defs.append('PRIMARY KEY (id)')
+    ddl = (
+        f'CREATE TABLE {table_name} (\n'
+        + '    ' + ',\n    '.join(col_defs) + '\n'
+        + ');'
+    )
+    # UPSERT
+    cols_bt = ', '.join(f'`{c}`' for c in ['id'] + clean_cols)
+    rows = []
+    for idx, row in df.iterrows():
+        vals = [str(idx + 1)] + [escape_value(row[col], df[col].dtype) for col in clean_cols]
+        rows.append(f"({', '.join(vals)})")
+    upsert = (
+        f'UPSERT INTO {table_name}\n'
+        + f'    ({cols_bt})\n'
+        + 'VALUES\n'
+        + '    ' + ',\n    '.join(rows)
+        + ';'
+    )
+    return ddl, upsert
+
+
 def main():
-    parser = argparse.ArgumentParser(description='Генерация SQL-скрипта для создания таблицы в Yandex DB и вставки данных из CSV')
-    parser.add_argument('csv_file', help='Путь к входному CSV-файлу')
-    parser.add_argument('-o', '--output', default=None, help='Путь к выходному SQL-файлу (по умолчанию — вывод в stdout)')
-    parser.add_argument('-t', '--table', default=None, help='Имя создаваемой таблицы (по умолчанию — имя CSV без расширения)')
+    parser = argparse.ArgumentParser(
+        description='Генерация DDL и UPSERT для Yandex DB (YDB) из CSV'
+    )
+    parser.add_argument('csv_file', help='Путь к CSV-файлу')
+    parser.add_argument('-o', '--output', default=None,
+                        help='Базовое имя для сохранения SQL. Будут созданы <base>_ddl.sql и <base>_upsert.sql')
+    parser.add_argument('-t', '--table', default=None,
+                        help='Имя таблицы (по умолчанию — имя CSV без расширения)')
     args = parser.parse_args()
 
-    df = pd.read_csv(args.csv_file)
+    # Чтение CSV: распознаем даты автоматически
+    df = pd.read_csv(args.csv_file, parse_dates=True)
+    df.columns = [sanitize_column(c) for c in df.columns]
+    table_name = sanitize_column(args.table or os.path.splitext(os.path.basename(args.csv_file))[0])
 
-    # Определяем имя таблицы
-    table_name = args.table or os.path.splitext(os.path.basename(args.csv_file))[0]
-    column_defs = []
-    for col in df.columns:
-        sql_type = infer_sql_type(df[col].dtype)
-        # Оборачиваем имена колонок в двойные кавычки на случай специальных символов
-        column_defs.append(f'"{col}" {sql_type}')
+    ddl, upsert = generate_sql(df, table_name)
 
-    create_stmt = (
-        f'CREATE TABLE "{table_name}" (\n'
-        + '    ' + ',\n    '.join(column_defs) + '\n'
-        + ');\n\n'
-    )
-
-    # INSERT-ы для каждой строки
-    insert_stmts = []
-    cols_quoted = ', '.join([f'"{col}"' for col in df.columns])
-    for _, row in df.iterrows():
-        values = ', '.join(escape_value(x) for x in row)
-        insert_stmts.append(f'INSERT INTO "{table_name}" ({cols_quoted}) VALUES ({values});')
-
-    sql = create_stmt + '\n'.join(insert_stmts)
-
-    # Выводим или сохраняем
     if args.output:
-        with open(args.output, 'w', encoding='utf-8') as f:
-            f.write(sql)
-        print(f"SQL-скрипт сохранен в '{args.output}'")
+        base = os.path.splitext(args.output)[0]
+        ddl_file = f"{base}_ddl.sql"
+        upsert_file = f"{base}_upsert.sql"
+        with open(ddl_file, 'w', encoding='utf-8') as f:
+            f.write(ddl + '\n')
+        with open(upsert_file, 'w', encoding='utf-8') as f:
+            f.write(upsert + '\n')
+        print(f"DDL сохранён в {ddl_file}")
+        print(f"UPSERT сохранён в {upsert_file}")
     else:
-        print(sql)
-
+        print("-- DDL запрос --")
+        print(ddl)
+        print("\n-- UPSERT запрос --")
+        print(upsert)
 
 if __name__ == '__main__':
     main()
