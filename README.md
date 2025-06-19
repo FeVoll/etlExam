@@ -94,7 +94,7 @@
 <details>
   <summary>Пункт 2. PySpark-скрипт для обработки данных</summary>
 
-Мы написали `process_transactions.py`, который:
+Мы написали `process_csv.py`, который:
 
 1. Читает `s3a://etlexam/data.csv`
 2. Фильтрует строки, где отсутствуют `Name` или `Surname`
@@ -104,7 +104,7 @@
 6. Дропает все оставшиеся строки с `NULL`
 7. Сохраняет чистый DataFrame в Parquet по пути `s3a://etlexam/output/transactions_clean.parquet`
 
-Скрипт лежит в `scripts/process_transactions.py` в бакете.
+Скрипт лежит в `scripts/process_csv.py` в бакете.
 
 </details>
 
@@ -114,14 +114,14 @@
 Файл `dags/data_processing_dag.py`:
 
 * Первый таск создаёт кластер Yandex Data Proc (без HDFS-узлов).
-* Второй таск запускает `process_transactions.py` через `DataprocCreatePysparkJobOperator`, передавая `--input_path` и `--output_path`.
+* Второй таск запускает `process_csv.py` через `DataprocCreatePysparkJobOperator`, передавая `--input_path` и `--output_path`.
 * Третий таск удаляет кластер (`ALL_DONE`).
 
 В результате каждый день (по расписанию) пайплайн автоматически:
 
 1. Создаёт Spark-кластер
 2. Обрабатывает `data.csv`
-3. Пишет `transactions_clean.parquet` в бакет
+3. Пишет `transactions_clean` в бакет
 4. Удаляет кластер
 
 </details>
@@ -129,10 +129,10 @@
 <details>
   <summary>Пункт 4. Результаты выполнения</summary>
 
-После успешного запуска DAG в бакете `etlexam/output/transactions_clean.parquet` появилась папка:
+После успешного запуска DAG в бакете `etlexam` появилась папка:
 
 ```
-output/transactions_clean.parquet/
+transactions_clean/
  ├── _SUCCESS
  └── part-00000-...-c000.snappy.parquet
 ```
