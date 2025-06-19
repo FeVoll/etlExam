@@ -157,7 +157,7 @@ transactions_clean/
 
 **Задание 2 выполнено.**
 
-# Задание 3 — Parquet ➜ Kafka ➜ PostgreSQL (стриминг)
+# Задание 3 — Работа с топиками Apache Kafka® с помощью PySpark-заданий в Yandex Data Processing
 
 **Цель:** сквозной пайплайн: Spark-джоб пачками отправляет очищенный Parquet в Kafka, второй Spark-стрим забирает сообщения и пишет их в PostgreSQL.
 
@@ -179,18 +179,26 @@ transactions_clean/
 </details>
 
 <details>
-<summary>3. Созданы задачи в Data Proc</summary>
+<summary>3. Созданы и выполнены задачи в Data Proc</summary>
 
-(скрин задач  Data Proc)
+Запись (Задание завершено, т.к. настроено завершение по окончаю данных)
+
+![image](https://github.com/user-attachments/assets/d75d16c8-0305-4da0-9f0a-844c030051b8)
+
+Чтение (Задание остановлено, т.к. настроено бесконечное чтение из кафки, работает до того, пока его не остановят руками)
+
+![image](https://github.com/user-attachments/assets/211b10c6-7243-4c6c-a28a-775a78bf8749)
+
 
 </details>
 
 <details>
 <summary>4. Итог</summary>
 
-Задачи выполнились, данные появились в базе Postgres.
+Задачи выполнились, данные из отчищенного parquet появились в базе Postgres.
 
-(Скрин из базы)
+![image](https://github.com/user-attachments/assets/40a57970-01a3-4bcc-8488-3d5729c4ea75)
+
 
 </details>
 
