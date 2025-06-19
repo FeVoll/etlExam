@@ -18,7 +18,7 @@ YC_DP_SSH_PUBLIC_KEY = (
 )
 YC_DP_SUBNET_ID = 'e2l493987tqlbhl1o6bq'
 YC_DP_SA_ID = 'aje4h1l7o6d0pu28o45h'
-YC_DP_METASTORE_URI = '10.129.0.22'
+YC_DP_METASTORE_URI = '10.129.0.3'
 YC_BUCKET = 'etlexam'
 
 with DAG(
@@ -65,7 +65,7 @@ with DAG(
         main_python_file_uri=f's3a://{YC_BUCKET}/scripts/process_csv.py',
         args=[
             '--input_path',  f's3a://{YC_BUCKET}/data.csv',
-            '--output_path', f's3a://{YC_BUCKET}/output/data_clean.parquet',
+            '--output_path', f's3a://{YC_BUCKET}/transactions_clean',
         ],
         cluster_id='{{ ti.xcom_pull(task_ids="create_dp_cluster", key="cluster_id") }}',
     )

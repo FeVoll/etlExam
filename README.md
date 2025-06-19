@@ -102,7 +102,7 @@
 4. Объединяет `Name` + `Surname` → `FullName`
 5. Добавляет колонку `processing_date = current_date()`
 6. Дропает все оставшиеся строки с `NULL`
-7. Сохраняет чистый DataFrame в Parquet по пути `s3a://etlexam/output/transactions_clean.parquet`
+7. Сохраняет чистый DataFrame в Parquet по пути `s3a://etlexam/transactions_clean`
 
 Скрипт лежит в `scripts/process_csv.py` в бакете.
 
@@ -113,8 +113,8 @@
 
 Файл `dags/data_processing_dag.py`:
 
-* Первый таск создаёт кластер Yandex Data Proc (без HDFS-узлов).
-* Второй таск запускает `process_csv.py` через `DataprocCreatePysparkJobOperator`, передавая `--input_path` и `--output_path`.
+* Первый таск создаёт кластер Yandex Data Proc.
+* Второй таск запускает `process_csv.py`.
 * Третий таск удаляет кластер (`ALL_DONE`).
 
 В результате каждый день (по расписанию) пайплайн автоматически:
@@ -157,3 +157,41 @@ transactions_clean/
 
 **Задание 2 выполнено.**
 
+# Задание 3 — Parquet ➜ Kafka ➜ PostgreSQL (стриминг)
+
+**Цель:** сквозной пайплайн: Spark-джоб пачками отправляет очищенный Parquet в Kafka, второй Spark-стрим забирает сообщения и пишет их в PostgreSQL.
+
+<details>
+<summary>1. Инфраструктура</summary>
+
+Подняты кластеры Data Proc, Kafka, Postgres. Настроен сервисный аккаунты и создан бакет.
+
+</details>
+
+<details>
+<summary>2. PySpark-скрипты</summary>
+
+| Файл | Действие                                                                                                                                   |
+| ---- |--------------------------------------------------------------------------------------------------------------------------------------------|
+| `kafka-write.py` | читает `s3a://etlexam/transactions_clean`, каждые **100** строк пока не кончится ⇒ JSON ⇒ Kafka                                            |
+| `kafka-read-stream.py` | создаёт `transactions_stream` (JDBC DDL) и стримом пишет данные из кафки в Postgres (`trigger = 1 s`, checkpoint очереди в Object Storage) |
+
+</details>
+
+<details>
+<summary>3. Созданы задачи в Data Proc</summary>
+
+(скрин задач  Data Proc)
+
+</details>
+
+<details>
+<summary>4. Итог</summary>
+
+Задачи выполнились, данные появились в базе Postgres.
+
+(Скрин из базы)
+
+</details>
+
+**✅ Задание 3 выполнено.**

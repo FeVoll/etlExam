@@ -1,60 +1,99 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_date, current_date, concat_ws, trim
-from pyspark.sql.types import IntegerType, DoubleType
-from pyspark.sql.utils import AnalysisException
+from pyspark.sql.functions import (
+    col, to_date, current_date, concat_ws, trim
+)
+from pyspark.sql.types import LongType, DoubleType
 
-# === Spark session ===
-spark = SparkSession.builder \
-    .appName("Transactions CSV ETL with FullName") \
+# ─── Пути в Object Storage ───────────────────
+SOURCE = "s3a://etlexam/data.csv"          # CSV-файл
+TARGET = "s3a://etlexam/transactions_clean"  # Папка-выход Parquet
+
+spark = (
+    SparkSession.builder
+    .appName("Transactions CSV → Parquet (clean)")
     .getOrCreate()
-
-# === Пути ===
-source_path = "s3a://etlexam/data.csv"
-target_path = "s3a://etlexam/transactions_clean"
+)
 
 try:
-    print(f"Чтение данных из: {source_path}")
-    df = spark.read \
-        .option("header", "true") \
-        .option("inferSchema", "true") \
-        .csv(source_path)
+    # -------------------------------------------------------------------------
+    # Читаем CSV
+    # -------------------------------------------------------------------------
+    print(f"► Читаем CSV из {SOURCE}")
+    df = (
+        spark.read
+        .option("header", "true")
+        .option("inferSchema", "true")
+        .csv(SOURCE)
+    )
 
-    print("Схема исходных данных:")
-    df.printSchema()
-
-    # 1) Убираем строки, где Name или Surname пустые или NULL
+    # -------------------------------------------------------------------------
+    # Фильтр строк с пустыми Name / Surname
+    # -------------------------------------------------------------------------
     df = df.filter(
         col("Name").isNotNull() & (trim(col("Name")) != "") &
         col("Surname").isNotNull() & (trim(col("Surname")) != "")
     )
 
-    # 2) Приведение типов, формат дат, добавление FullName и processing_date
+    # -------------------------------------------------------------------------
+    # Создаём «чистые» колонки и приводим типы
+    # -------------------------------------------------------------------------
     df = (
         df
-        .withColumn("Customer_ID",        col("Customer ID").cast(IntegerType()))
+        # числовые / денежные
+        .withColumn("Customer_ID",        col("Customer ID").cast(LongType()))
         .withColumn("Transaction_Amount", col("Transaction Amount").cast(DoubleType()))
-        .withColumn("Birthdate",          to_date(col("Birthdate"), "yyyy-MM-dd"))
-        .withColumn("Date",               to_date(col("Date"),      "yyyy-MM-dd"))
-        .withColumn("FullName",           concat_ws(" ", col("Name"), col("Surname")))
-        .withColumn("processing_date",    current_date())
+        # даты
+        .withColumn("Birthdate", to_date(col("Birthdate"), "yyyy-MM-dd"))
+        .withColumn("Date",      to_date(col("Date"),      "yyyy-MM-dd"))
+        # новый FullName
+        .withColumn("FullName",  concat_ws(" ", col("Name"), col("Surname")))
+        # переименование колонки-сорца
+        .withColumnRenamed("Merchant Name", "Merchant_Name")
+        # дата обработки
+        .withColumn("processing_date", current_date())
     )
 
-    # 3) Удаляем оставшиеся строки с любыми другими NULL
-    df_clean = df.na.drop()
+    # -------------------------------------------------------------------------
+    # Оставляем и упорядочиваем ровно 9 нужных полей
+    # -------------------------------------------------------------------------
+    keep_cols = [
+        "Customer_ID",        # bigint
+        "FullName",           # string
+        "Gender",             # string
+        "Transaction_Amount", # double
+        "Birthdate",          # date
+        "Date",               # date
+        "Merchant_Name",      # string
+        "Category",           # string
+        "processing_date"     # date
+    ]
 
-    print("Схема после преобразований:")
+    df_clean = (
+        df.select(*keep_cols)  # отбрасываем всё лишнее
+          .na.drop()           # на всякий случай убираем записи с NULL
+    )
+
+    # -------------------------------------------------------------------------
+    # Быстрая проверка и запись
+    # -------------------------------------------------------------------------
+    print("Итоговая схема:")
     df_clean.printSchema()
+    print("Пример строк:")
+    df_clean.show(5, truncate=False)
 
-    print("Первые 5 строк после очистки и объединения имени:")
-    df_clean.select("Customer_ID", "FullName", "Transaction_Amount", "Date", "Category", "processing_date") \
-            .show(5, truncate=False)
+    print(f"Записываем Parquet в {TARGET}")
+    (
+        df_clean
+        .write
+        .mode("overwrite")
+        .parquet(TARGET)
+    )
+    print("Готово")
 
-    print(f"Запись в Parquet: {target_path}")
-    df_clean.write.mode("overwrite").parquet(target_path)
-
-    print("Данные успешно сохранены в Parquet.")
-
-except Exception as e:
-    print("Общая ошибка:", e)
+except Exception as exc:
+    # вывод полной трассировки для отладки
+    import traceback, sys
+    traceback.print_exc(file=sys.stderr)
+    print("Ошибка:", exc)
 finally:
     spark.stop()
