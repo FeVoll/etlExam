@@ -103,12 +103,13 @@
 <details>
   <summary>Пункт 3. Запустим DAG через веб-интерфейс и проверим результат выполнения</summary>
 
-  Спустя 7 попыток и правок DAG запустился успешно:
-  ![image](https://github.com/user-attachments/assets/c5093ce7-685b-4c7e-a2d5-fd9368cdde5e)
+  DAG запустился успешно:
+  ![image](https://github.com/user-attachments/assets/6da726fb-b235-45a7-8fe8-1e210eb68ed0)
+
 
   В Object Storage в папке countries появились нужные файлы и логи:
-  ![image](https://github.com/user-attachments/assets/a88562a6-3491-49bb-8efe-0d242931e3b8a)
-  ![image](https://github.com/user-attachments/assets/1b589eaa-e2c4-4695-b53c-6fd2542abc1f)
+  ![image](https://github.com/user-attachments/assets/c68f7274-7fb4-4f9b-80d4-1f41394569c8)
+
 </details>
 
 **Задание 2 завершено**
