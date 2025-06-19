@@ -64,8 +64,8 @@ with DAG(
         task_id='run_pyspark_job',
         main_python_file_uri=f's3a://{YC_BUCKET}/scripts/process_csv.py',
         args=[
-            '--input_path',  f's3a://{YC_BUCKET}/TwizzlerData.csv',
-            '--output_path', f's3a://{YC_BUCKET}/output/TwizzlerData_clean.parquet',
+            '--input_path',  f's3a://{YC_BUCKET}/data.csv',
+            '--output_path', f's3a://{YC_BUCKET}/output/data_clean.parquet',
         ],
         cluster_id='{{ ti.xcom_pull(task_ids="create_dp_cluster", key="cluster_id") }}',
     )

@@ -77,13 +77,12 @@
 </details>
 
 **Задание 1 завершено**
+# Задание 2 — Автоматизация обработки CSV-данных в Yandex Data Processing через Apache Airflow
 
-# Задание 2 — Автоматизация работы с Yandex Data Processing при помощи Apache AirFlow
-
-**Цель:** Автоматизировать обработку данных из Object Storage с помощью PySpark и Apache Airflow в Yandex Data Processing.
+**Цель:** Поднять пайплайн, который на входе берёт CSV из Object Storage, чистит и трансформирует данные с помощью PySpark, объединяет имя и фамилию в одно поле, отбрасывает пустые строки, добавляет дату обработки и сохраняет результат в Parquet — всё это автоматически, через DAG в Managed Airflow.
 
 <details>
-  <summary>Пункт 1. Подготовим инфраструктуру по инструкции</summary>
+  <summary>Пункт 1. Подготовка инфраструктуры</summary>
 
   Кластер Managed Service for Apache Airflow:
   ![image](https://github.com/user-attachments/assets/c5c9f684-ed56-4d5f-aa1c-54950cda3619)
@@ -93,23 +92,68 @@
 </details>
 
 <details>
-  <summary>Пункт 2. Подготовим PySpark-задание</summary>
+  <summary>Пункт 2. PySpark-скрипт для обработки данных</summary>
 
-  Подготовим скрипты `create-table.py` и `Data-Processing-DAG.py` и разместим их в нашем Object Storage в соответствующих папках. Для `Data-Processing-DAG.py` пришлось изменить под более "легкую" конфигурацию кластера.
+Мы написали `process_transactions.py`, который:
 
-  Скрипты находятся в папке task2.
+1. Читает `s3a://etlexam/data.csv`
+2. Фильтрует строки, где отсутствуют `Name` или `Surname`
+3. Кастит колонки (`Customer_ID`, `Transaction_Amount`) и парсит даты (`Birthdate`, `Date`)
+4. Объединяет `Name` + `Surname` → `FullName`
+5. Добавляет колонку `processing_date = current_date()`
+6. Дропает все оставшиеся строки с `NULL`
+7. Сохраняет чистый DataFrame в Parquet по пути `s3a://etlexam/output/transactions_clean.parquet`
+
+Скрипт лежит в `scripts/process_transactions.py` в бакете.
+
 </details>
 
 <details>
-  <summary>Пункт 3. Запустим DAG через веб-интерфейс и проверим результат выполнения</summary>
+  <summary>Пункт 3. DAG для автоматизации в Airflow</summary>
 
-  DAG запустился успешно:
-  ![image](https://github.com/user-attachments/assets/6da726fb-b235-45a7-8fe8-1e210eb68ed0)
+Файл `dags/data_processing_dag.py`:
 
+* Первый таск создаёт кластер Yandex Data Proc (без HDFS-узлов).
+* Второй таск запускает `process_transactions.py` через `DataprocCreatePysparkJobOperator`, передавая `--input_path` и `--output_path`.
+* Третий таск удаляет кластер (`ALL_DONE`).
 
-  В Object Storage в папке countries появились нужные файлы и логи:
-  ![image](https://github.com/user-attachments/assets/c68f7274-7fb4-4f9b-80d4-1f41394569c8)
+В результате каждый день (по расписанию) пайплайн автоматически:
+
+1. Создаёт Spark-кластер
+2. Обрабатывает `data.csv`
+3. Пишет `transactions_clean.parquet` в бакет
+4. Удаляет кластер
 
 </details>
 
-**Задание 2 завершено**
+<details>
+  <summary>Пункт 4. Результаты выполнения</summary>
+
+После успешного запуска DAG в бакете `etlexam/output/transactions_clean.parquet` появилась папка:
+
+```
+output/transactions_clean.parquet/
+ ├── _SUCCESS
+ └── part-00000-...-c000.snappy.parquet
+```
+
+Файл `part-00000-...-c000.snappy.parquet` содержит чистые данные со схемой:
+
+| Customer\_ID | FullName        | Transaction\_Amount | Birthdate  | Date       | Merchant\_Name         | Category | processing\_date |
+| ------------ | --------------- | ------------------- | ---------- | ---------- | ---------------------- | -------- | ---------------- |
+| 752858       | Sean Rodriguez  | 35.47               | 2002-10-20 | 2023-04-03 | Smith-Russell          | Cosmetic | 2025-06-19       |
+| 26381        | Michelle Phelps | 2552.72             | 1985-10-24 | 2023-07-17 | Peck, Spence and Young | Travel   | 2025-06-19       |
+| …            | …               | …                   | …          | …          | …                      | …        | …                |
+
+  DAG запустился успешно:
+
+![image](https://github.com/user-attachments/assets/6da726fb-b235-45a7-8fe8-1e210eb68ed0)
+
+  В Object Storage появились нужные файлы и логи:
+  
+![image](https://github.com/user-attachments/assets/c68f7274-7fb4-4f9b-80d4-1f41394569c8)
+
+</details>
+
+**Задание 2 выполнено.**
+
