@@ -159,12 +159,13 @@ transactions_clean/
 
 # Задание 3 — Работа с топиками Apache Kafka® с помощью PySpark-заданий в Yandex Data Processing
 
-**Цель:** сквозной пайплайн: Spark-джоб пачками отправляет очищенный Parquet в Kafka, второй Spark-стрим забирает сообщения и пишет их в PostgreSQL.
+**Цель:** Настроить цепь процессов: Spark-джоб пачками отправляет очищенный Parquet в Kafka, второй Spark-стрим забирает сообщения и пишет их в PostgreSQL.
 
 <details>
-<summary>1. Инфраструктура</summary>
+  
+<summary>1. Подготовка инфраструктуры </summary>
 
-Подняты кластеры Data Proc, Kafka, Postgres. Настроен сервисный аккаунты и создан бакет.
+Подняты кластеры Data Proc, Kafka, Postgres. Настроен сервисный аккаунты и создан бакет. (По документации-инструкции)
 
 </details>
 
@@ -193,7 +194,7 @@ transactions_clean/
 </details>
 
 <details>
-<summary>4. Итог</summary>
+<summary>4. Результаты выполнения</summary>
 
 Задачи выполнились, данные из отчищенного parquet появились в базе Postgres.
 
